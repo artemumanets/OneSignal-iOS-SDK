@@ -325,7 +325,7 @@ static BOOL _isInAppMessagingPaused = false;
     }
 }
 
-- (void)sendClickRESTCall:(OSInAppMessage *)message withAction:(OSInAppMessageAction *)action {
+- (void)handleOneTimeCalls:(OSInAppMessage *)message withAction:(OSInAppMessageAction *)action {
     // Make sure no click tracking is performed for IAM previews
     // If the IAM clickId exists within the cached clickedClickIds return early so the click is not tracked
     // Handles body, button, or image clicks
@@ -333,7 +333,12 @@ static BOOL _isInAppMessagingPaused = false;
         return;
     // Add clickId to clickedClickIds
     [self.clickedClickIds addObject:action.clickId];
-   
+    
+    [self sendClickRESTCall:message withAction:action];
+    [self sendTagCallWithAction:action];
+}
+
+- (void)sendClickRESTCall:(OSInAppMessage *)message withAction:(OSInAppMessageAction *)action {
     let metricsRequest = [OSRequestInAppMessageClicked withAppId:OneSignal.app_id
                                                     withPlayerId:OneSignal.currentSubscriptionState.userId
                                                    withMessageId:message.messageId
@@ -357,6 +362,16 @@ static BOOL _isInAppMessagingPaused = false;
                                       }];
 }
 
+- (void)sendTagCallWithAction:(OSInAppMessageAction *)action {
+    if (action.tag) {
+        OSInAppMessageTag *tag = action.tag;
+        if (tag.addTags)
+            [OneSignal sendTags:tag.addTags];
+        if (tag.removeTags)
+            [OneSignal deleteTags:tag.removeTags];
+    }
+}
+
 - (void)sendOutcomeWithAction:(OSInAppMessageAction *)action {
     if (action.outcome.unique) {
         [OneSignal sendUniqueClickActionOutcome:action.outcome.name];
@@ -375,7 +390,7 @@ static BOOL _isInAppMessagingPaused = false;
     if (self.actionClickBlock)
         self.actionClickBlock(action);
     
-    [self sendClickRESTCall:message withAction:action];
+    [self handleOneTimeCalls:message withAction:action];
     
     if (action.outcome) {
         [self sendOutcomeWithAction:action];

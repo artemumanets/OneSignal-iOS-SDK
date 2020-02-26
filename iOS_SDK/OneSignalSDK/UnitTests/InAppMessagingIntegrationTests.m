@@ -52,6 +52,8 @@
 #import "NSLocaleOverrider.h"
 #import "OSInAppMessageController.h"
 #import "NSDateOverrider.h"
+#import "OSInAppMessageTag.h"
+#import "NSObjectOverrider.h"
 
 @interface InAppMessagingIntegrationTests : XCTestCase
 
@@ -389,6 +391,58 @@
     [OSMessagingController.sharedInstance messageViewDidSelectAction:testMessage withAction:action];
     // The action shouldn't cause an "outcome" API request
     XCTAssertFalse(OneSignalClientOverrider.lastHTTPRequestType);
+}
+
+- (void)testMessageClickedLaunchesTagSendAndRemoveAPIRequest {
+    let message = [OSInAppMessageTestHelper testMessageJsonWithTriggerPropertyName:OS_DYNAMIC_TRIGGER_KIND_SESSION_TIME withId:@"test_id1" withOperator:OSTriggerOperatorTypeLessThan withValue:@10.0];
+    let registrationResponse = [OSInAppMessageTestHelper testRegistrationJsonWithMessages:@[message]];
+    
+    // the trigger should immediately evaluate to true and should
+    // be shown once the SDK is fully initialized.
+    [OneSignalClientOverrider setMockResponseForRequest:NSStringFromClass([OSRequestRegisterUser class]) withResponse:registrationResponse];
+    
+    [UnitTestCommonMethods initOneSignalAndThreadWait];
+    
+    // the message should now be displayed
+    // simulate a button press (action) on the inapp message
+    let action = [OSInAppMessageAction new];
+    action.clickType = @"button";
+    action.clickId = @"test_action_id_add";
+    // add tags to action
+    let tagKey = @"test1";
+    NSDictionary *addTags =  @{
+        @"add" : @{
+            tagKey : tagKey
+        }
+    };
+    action.tag = [OSInAppMessageTag instanceWithJson:addTags];
+    let testMessage = [OSInAppMessage instanceWithJson:message];
+
+    [OSMessagingController.sharedInstance messageViewDidSelectAction:testMessage withAction:action];
+     // Make sure all 3 sets of tags where send in 1 network call.
+    [NSObjectOverrider runPendingSelectors];
+    [UnitTestCommonMethods runBackgroundThreads];
+    [NSObjectOverrider runPendingSelectors];
+    // The action should cause an "send tag" API request
+    XCTAssertEqualObjects(OneSignalClientOverrider.lastHTTPRequestType, NSStringFromClass([OSRequestSendTagsToServer class]));
+    XCTAssertEqualObjects(OneSignalClientOverrider.lastHTTPRequest[@"tags"][tagKey], tagKey);
+
+    [OneSignalClientOverrider reset:self];
+    
+    NSDictionary *removeTags =  @{
+        @"remove" : @[tagKey]
+    };
+    action.clickId = @"test_action_id_remove"; // Make a different click id for the remove tags
+    action.tag = [OSInAppMessageTag instanceWithJson:removeTags];
+
+    [OSMessagingController.sharedInstance messageViewDidSelectAction:testMessage withAction:action];
+     // Make sure all 3 sets of tags where send in 1 network call.
+    [NSObjectOverrider runPendingSelectors];
+    [UnitTestCommonMethods runBackgroundThreads];
+    [NSObjectOverrider runPendingSelectors];
+    // The action should cause an "send tag" API request
+    XCTAssertEqualObjects(OneSignalClientOverrider.lastHTTPRequestType, NSStringFromClass([OSRequestSendTagsToServer class]));
+    XCTAssertEqualObjects(OneSignalClientOverrider.lastHTTPRequest[@"tags"][tagKey], @"");
 }
 
 - (void)testDisablingMessages_stillCreatesMessageQueue_butPreventsMessageDisplay {

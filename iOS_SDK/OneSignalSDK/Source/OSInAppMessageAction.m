@@ -76,7 +76,17 @@
         action.outcome = nil;
     }
     
+    if (json[@"tags"]) {
+        action.tag = [OSInAppMessageTag instanceWithJson:json[@"tag"]];
+    } else {
+        action.tag = nil;
+    }
+    
     return action;
+}
+
+- (NSString *)description {
+    return [NSString stringWithFormat:@"OSInAppMessageAction outcome: %@ \ntag: %@", _outcome, _tag];
 }
 
 @end
