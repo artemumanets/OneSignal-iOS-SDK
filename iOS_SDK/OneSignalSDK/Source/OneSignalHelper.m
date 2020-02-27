@@ -918,9 +918,9 @@ static OneSignal* singleInstance = nil;
                 else {
                     // Keep dispatch_async. Without this the url can take an extra 2 to 10 secounds to open.
 //                    [[UIApplication sharedApplication] openURL:url];
-                    NSLog("Will handle Link");
+                    NSLog(@"Will handle Link");
                     [[UIApplication sharedApplication] openURL:url options: @{UIApplicationOpenURLOptionUniversalLinksOnly : @(true) } completionHandler:^(BOOL success) {
-                        NSLog("Link handled");
+                        NSLog(@"Link handled");
                     }];
                 }
             });
